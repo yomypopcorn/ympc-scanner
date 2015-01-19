@@ -19,9 +19,6 @@ var eztv = eztvapi({
 	apiLimitInterval: config.eztv.rateLimitInterval
 });
 
-var fullScanCron = new CronJob(config.scan.fullScanCronPattern, fullScan, null, true);
-var activeScanCron = new CronJob(config.scan.activeScanCronPattern, activeScan, null, true);
-
 if (config.v || config.version) {
 	console.log(pkg.version);
 	process.exit(0);
@@ -38,6 +35,9 @@ if (config.fullscan) {
 		process.exit(0);
 	});
 }
+
+var fullScanCron = new CronJob(config.scan.fullScanCronPattern, fullScan, null, true);
+var activeScanCron = new CronJob(config.scan.activeScanCronPattern, activeScan, null, true);
 
 function fullScan (done) {
 	debug('full scan start');
