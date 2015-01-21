@@ -30,6 +30,8 @@ if (config.v || config.version) {
 	process.exit(0);
 }
 
+debug('running as ' + process.env.USER);
+
 if (config['active-scan']) {
 	return activeScan(function () {
 		process.exit(0);
