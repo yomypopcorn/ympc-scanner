@@ -1,4 +1,4 @@
-module.exports = require('rc')('yomypopcorn-scanner', {
+var defaults = {
 	'redis-socket': null,
 	'redis-host': '127.0.0.1',
 	'redis-port': 6379,
@@ -8,4 +8,6 @@ module.exports = require('rc')('yomypopcorn-scanner', {
 
 	'full-scan-cron-pattern': '0 0 0 * * *',
 	'active-scan-cron-pattern': '0 0 * * * *'
-});
+};
+
+module.exports = require('rc')('yomypopcorn-scanner', defaults);
