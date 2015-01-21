@@ -14,9 +14,13 @@ var utils = require('yomypopcorn-utils');
 var cb = utils.cb;
 var sien = utils.sien;
 
+var rateLimit = config['eztv-rate-limit'].split('/');
+var rateLimitRequests = parseInt(rateLimit[0], 10);
+var rateLimitInterval = parseInt(rateLimit[1], 10);
+
 var eztv = eztvapi({
-	apiLimitRequests: config['eztv-rate-limit-requests'],
-	apiLimitInterval: config['eztv-rate-limit-interval']
+	apiLimitRequests: rateLimitRequests,
+	apiLimitInterval: rateLimitInterval
 });
 
 if (config.d || config.debug) {
@@ -28,13 +32,13 @@ if (config.v || config.version) {
 	process.exit(0);
 }
 
-if (config.activescan) {
+if (config['active-scan']) {
 	return activeScan(function () {
 		process.exit(0);
 	});
 }
 
-if (config.fullscan) {
+if (config['full-scan']) {
 	return fullScan(function () {
 		process.exit(0);
 	});

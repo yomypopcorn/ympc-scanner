@@ -4,8 +4,7 @@ module.exports = require('rc')('yomypopcorn-scanner', {
 	'redis-port': 6379,
 	'redis-password': null,
 
-	'eztv-limit-requests': 1,
-	'eztv-limit-interval': 1000,
+	'eztv-rate-limit': '1/1000',
 
 	'full-scan-cron-pattern': '0 0 0 * * *',
 	'active-scan-cron-pattern': '0 0 * * * *'
