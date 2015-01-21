@@ -15,9 +15,13 @@ var cb = utils.cb;
 var sien = utils.sien;
 
 var eztv = eztvapi({
-	apiLimitRequests: config.eztv.rateLimitRequests,
-	apiLimitInterval: config.eztv.rateLimitInterval
+	apiLimitRequests: config['eztv-rate-limit-requests'],
+	apiLimitInterval: config['eztv-rate-limit-interval']
 });
+
+if (config.d || config.debug) {
+	process.env.DEBUG='*';
+}
 
 if (config.v || config.version) {
 	console.log(pkg.version);
@@ -36,8 +40,8 @@ if (config.fullscan) {
 	});
 }
 
-var fullScanCron = new CronJob(config.scan.fullScanCronPattern, fullScan, null, true);
-var activeScanCron = new CronJob(config.scan.activeScanCronPattern, activeScan, null, true);
+var fullScanCron = new CronJob(config['full-scan-cron-pattern'], fullScan, null, true);
+var activeScanCron = new CronJob(config['active-scan-cron-pattern'], activeScan, null, true);
 
 function fullScan (done) {
 	debug('full scan start');

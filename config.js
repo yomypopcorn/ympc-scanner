@@ -1,18 +1,12 @@
 module.exports = require('rc')('yomypopcorn-scanner', {
-	redis: {
-		socket: null,
-		host: '127.0.0.1',
-		port: 6379,
-		password: null
-	},
+	'redis-socket': null,
+	'redis-host': '127.0.0.1',
+	'redis-port': 6379,
+	'redis-password': null,
 
-	eztv: {
-		rateLimitRequests: 1,
-		rateLimitInterval: 1000
-	},
+	'eztv-limit-requests': 1,
+	'eztv-limit-interval': 1000,
 
-	scan: {
-		fullScanCronPattern: '15 45 * * * *',
-		activeScanCronPattern: '0 */5 * * * *'
-	}
+	'full-scan-cron-pattern': '15 45 * * * *',
+	'active-scan-cron-pattern': '0 */5 * * * *'
 });
