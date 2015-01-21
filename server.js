@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 
+var config = require('./config.js');
+if (config.d || config.debug) { process.env.DEBUG='*'; }
+
 var path = require('path');
 var pkg = require(path.resolve(__dirname, 'package.json'));
 var debug = require('debug')('yomypopcorn:scanner');
-var config = require('./config.js');
 var db = require('./lib/dbclient');
 var eztvapi = require('eztvapi');
 var through2 = require('through2');
@@ -22,10 +24,6 @@ var eztv = eztvapi({
 	apiLimitRequests: rateLimitRequests,
 	apiLimitInterval: rateLimitInterval
 });
-
-if (config.d || config.debug) {
-	process.env.DEBUG='*';
-}
 
 if (config.v || config.version) {
 	console.log(pkg.version);
