@@ -7,6 +7,6 @@ module.exports = require('rc')('yomypopcorn-scanner', {
 	'eztv-limit-requests': 1,
 	'eztv-limit-interval': 1000,
 
-	'full-scan-cron-pattern': '15 45 * * * *',
-	'active-scan-cron-pattern': '0 */5 * * * *'
+	'full-scan-cron-pattern': '0 0 0 * * *',
+	'active-scan-cron-pattern': '0 0 * * * *'
 });
