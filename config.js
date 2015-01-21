@@ -7,7 +7,7 @@ var defaults = {
 	'eztv-rate-limit': '1/1000',
 
 	'full-scan-cron-pattern': '0 0 0 * * *',
-	'active-scan-cron-pattern': '0 0 * * * *'
+	'active-scan-cron-pattern': '0 0 1-23 * * *'
 };
 
 module.exports = require('rc')('yomypopcorn-scanner', defaults);
