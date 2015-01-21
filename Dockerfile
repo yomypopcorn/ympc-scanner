@@ -2,7 +2,10 @@ FROM node:0.10.35
 
 RUN groupadd -r yomypopcorn && useradd -r -g yomypopcorn yomypopcorn
 RUN mkdir /src
+
 COPY docker-entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
 COPY . /src/
 
 RUN \
@@ -14,4 +17,4 @@ USER yomypopcorn
 
 WORKDIR /src
 
-CMD ['/entrypoint.sh']
+CMD [ "/entrypoint.sh" ]
