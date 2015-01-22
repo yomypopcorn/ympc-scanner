@@ -3,7 +3,7 @@
   "version": "0.0.1",
   "description": "",
   "bin": {
-	  "yomypopcorn-scanner": "./server.js"
+	  "yomypopcorn-scanner": "./bin/cli.js"
   },
   "contributors": [
     "Max Kueng (http://maxkueng.com/contact)"

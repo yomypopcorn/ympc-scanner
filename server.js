@@ -1,12 +1,5 @@
-#!/usr/bin/env node
-
-var config = require('./config.js');
-if (config.d || config.debug) { process.env.DEBUG='*'; }
-
-var path = require('path');
-var pkg = require(path.resolve(__dirname, 'package.json'));
 var debug = require('debug')('yomypopcorn:scanner');
-var db = require('./lib/dbclient');
+var db = require('./dbclient');
 var eztvapi = require('eztvapi');
 var through2 = require('through2');
 var moment = require('moment');
@@ -16,81 +9,77 @@ var utils = require('yomypopcorn-utils');
 var cb = utils.cb;
 var sien = utils.sien;
 
-var rateLimit = config['eztv-rate-limit'].split('/');
-var rateLimitRequests = parseInt(rateLimit[0], 10);
-var rateLimitInterval = parseInt(rateLimit[1], 10);
+exports = module.exports = server;
 
-var eztv = eztvapi({
-	apiLimitRequests: rateLimitRequests,
-	apiLimitInterval: rateLimitInterval
-});
+function server (config) {
 
-if (config.v || config.version) {
-	console.log(pkg.version);
-	process.exit(0);
-}
+	debug('running as ' + process.env.USER);
 
-debug('running as ' + process.env.USER);
+	var rateLimit = config['eztv-rate-limit'].split('/');
+	var rateLimitRequests = parseInt(rateLimit[0], 10);
+	var rateLimitInterval = parseInt(rateLimit[1], 10);
 
-if (config['active-scan']) {
-	return activeScan(function () {
-		process.exit(0);
+	var eztv = eztvapi({
+		apiLimitRequests: rateLimitRequests,
+		apiLimitInterval: rateLimitInterval
 	});
-}
 
-if (config['full-scan']) {
-	return fullScan(function () {
-		process.exit(0);
-	});
-}
+	function start () {
+		var fullScanCron = new CronJob(config['full-scan-cron-pattern'], fullScan, null, true);
+		var activeScanCron = new CronJob(config['active-scan-cron-pattern'], activeScan, null, true);
+	}
 
-var fullScanCron = new CronJob(config['full-scan-cron-pattern'], fullScan, null, true);
-var activeScanCron = new CronJob(config['active-scan-cron-pattern'], activeScan, null, true);
+	function fullScan (done) {
+		debug('full scan start');
 
-function fullScan (done) {
-	debug('full scan start');
+		var s = stats();
 
-	var s = stats();
+		eztv.createShowsStream()
+			.pipe(loadDetails(eztv))
+			.pipe(postProcess())
+			.pipe(checkNewEpisode())
+			.pipe(save())
+			.pipe(s)
+			.pipe(log())
+			.pipe(sink())
+			.on('error', function (err) {
+				debug('full scan error', err);
+			})
+			.on('finish', function () {
+				debug('full scan complete', s.stats);
+				db.log('fullscan', s.stats);
+				cb(done);
+			});
+	}
 
-	eztv.createShowsStream()
-		.pipe(loadDetails())
-		.pipe(postProcess())
-		.pipe(checkNewEpisode())
-		.pipe(save())
-		.pipe(s)
-		.pipe(log())
-		.pipe(sink())
-		.on('error', function (err) {
-			debug('full scan error', err);
-		})
-		.on('finish', function () {
-			debug('full scan complete', s.stats);
-			db.log('fullscan', s.stats);
-			cb(done);
-		});
-}
+	function activeScan (done) {
+		debug('active scan start');
 
-function activeScan (done) {
-	debug('active scan start');
+		var s = stats();
 
-	var s = stats();
+		db.createActiveShowsStream()
+			.pipe(loadDetails(eztv))
+			.pipe(postProcess())
+			.pipe(checkNewEpisode())
+			.pipe(save())
+			.pipe(s)
+			.pipe(log())
+			.pipe(sink())
+			.on('error', function (err) {
+				debug('active scan error', err);
+			})
+			.on('finish', function () {
+				debug('active scan complete', s.stats);
+				db.log('activescan', s.stats);
+				cb(done);
+			});
+	}
 
-	db.createActiveShowsStream()
-		.pipe(loadDetails())
-		.pipe(postProcess())
-		.pipe(checkNewEpisode())
-		.pipe(save())
-		.pipe(s)
-		.pipe(log())
-		.pipe(sink())
-		.on('error', function (err) {
-			debug('active scan error', err);
-		})
-		.on('finish', function () {
-			debug('active scan complete', s.stats);
-			db.log('activescan', s.stats);
-			cb(done);
-		});
+	return {
+		activeScan: activeScan,
+		fullScan: fullScan,
+		start: start
+	};
 }
 
 function log () {
@@ -139,7 +128,7 @@ function stats () {
 	return stream;
 }
 
-function loadDetails () {
+function loadDetails (eztv) {
 	return through2.obj(function (show, enc, next) {
 		var stream = this;
 
