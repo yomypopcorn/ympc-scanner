@@ -25,6 +25,10 @@ function server (config) {
 	});
 
 	function start () {
+		debug('server started');
+		debug('full scan pattern', config['full-scan-cron-pattern']);
+		debug('active scan pattern', config['active-scan-cron-pattern']);
+
 		var fullScanCron = new CronJob(config['full-scan-cron-pattern'], fullScan, null, true);
 		var activeScanCron = new CronJob(config['active-scan-cron-pattern'], activeScan, null, true);
 	}
