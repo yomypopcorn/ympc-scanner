@@ -5,6 +5,14 @@
   "bin": {
 	  "yomypopcorn-scanner": "./bin/cli.js"
   },
+  "files": [
+    "bin/cli.js",
+    "config.js",
+    "dbclient.js",
+    "server.js",
+    "LICENSE",
+    "README.md"
+  ],
   "contributors": [
     "Max Kueng (http://maxkueng.com/contact)"
   ],
