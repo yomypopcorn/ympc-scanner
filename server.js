@@ -111,13 +111,18 @@ function stats () {
 				duration: 0,
 				totalShows: 0,
 				activeShows: 0,
-				inactiveShows: 0
+				inactiveShows: 0,
+				newEpisodes: 0
 			};
 		}
 
 		this.stats.end = +moment.utc();
 		this.stats.duration = this.stats.end - this.stats.start;
 		this.stats.totalShows += 1;
+
+		if (show.hasNewEpisode) {
+			this.stats.newEpisodes += 1;
+		}
 
 		if (show.active) {
 			this.stats.activeShows += 1;
@@ -198,6 +203,8 @@ function checkNewEpisode () {
 					new_season: latestEpisode ? latestEpisode.season : null,
 					new_episode: latestEpisode ? latestEpisode.episode : null
 				});
+
+				show.hasNewEpisode = true;
 
 				debug('new episode', show.title, 'S' + latestEpisode.season + 'E' + latestEpisode.episode, latestEpisode.sien);
 			}
