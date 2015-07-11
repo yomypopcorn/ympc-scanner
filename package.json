@@ -24,7 +24,7 @@
     "moment": "^2.9.0",
     "rc": "^0.5.5",
     "through2": "^0.6.3",
-    "yomypopcorn-dbclient": "0.0.1",
+    "yomypopcorn-dbclient": "git+ssh://git@github.com:yomypopcorn/yomypopcorn-dbclient.git",
     "yomypopcorn-utils": "0.0.1"
   }
 }
