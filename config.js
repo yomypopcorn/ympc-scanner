@@ -4,6 +4,7 @@ var defaults = {
 	'redis-port': 6379,
 	'redis-password': null,
 
+	yoApiKey: 'yo-api-key',
 	'eztv-rate-limit': '1/1000',
 
 	'full-scan-cron-pattern': '0 0 0 * * *',

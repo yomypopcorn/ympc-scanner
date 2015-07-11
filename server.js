@@ -5,6 +5,10 @@ var through2 = require('through2');
 var moment = require('moment');
 var CronJob = require('cron').CronJob;
 var utils = require('yomypopcorn-utils');
+var Yo = require('./yo');
+
+
+var yo;
 
 var cb = utils.cb;
 var sien = utils.sien;
@@ -12,6 +16,7 @@ var sien = utils.sien;
 exports = module.exports = server;
 
 function server (config) {
+	yo = new Yo(config.yoApiKey);
 
 	debug('running as ' + process.env.USER);
 
@@ -42,6 +47,7 @@ function server (config) {
 			.pipe(loadDetails(eztv))
 			.pipe(postProcess())
 			.pipe(checkNewEpisode())
+			.pipe(notifySubscribers())
 			.pipe(save())
 			.pipe(s)
 			.pipe(log())
@@ -87,7 +93,7 @@ function server (config) {
 }
 
 function log () {
-	var c = 0; 
+	var c = 0;
 	return through2.obj(function (chunk, enc, next) {
 		c += 1;
 		//console.log(c, chunk.title, chunk.active);
@@ -212,6 +218,24 @@ function checkNewEpisode () {
 			stream.push(show);
 			next();
 		});
+	});
+}
+
+function notifySubscribers () {
+	return through2.obj(function (show, enc, next) {
+		if (show.hasNewEpisode) {
+			db.getSubscribers(show.imdb_id, function (err, subscribers) {
+				if (err || !Array.isArray(subscribers)) return;
+				subscribers.forEach(function (subscriber) {
+					yo.yoLink(subscriber, 'http://yomypopcorn.com/feed', function (err) {
+						debug('new episode for: ' + subscriber);
+					});
+				})
+				debug('new episode ' + show.title);
+			});
+		}
+		stream.push(show);
+		next()
 	});
 }
 
