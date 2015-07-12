@@ -228,7 +228,7 @@ function notifySubscribers () {
 			db.getSubscribers(show.imdb_id, function (err, subscribers) {
 				if (err || !Array.isArray(subscribers)) return;
 				subscribers.forEach(function (subscriber) {
-					yo.yoLink(subscriber, 'http://yomypopcorn.com/feed', function (err) {
+					yo.yoLink(subscriber, 'http://app.yomypopcorn.com/feed', function (err) {
 						debug('new episode for: ' + subscriber);
 					});
 				})
