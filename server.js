@@ -109,7 +109,7 @@ function sink () {
 }
 
 function stats () {
-	stream = through2.obj(function (show, enc, next) {
+	var stream = through2.obj(function (show, enc, next) {
 		if (!this.stats) {
 			this.stats = {
 				start: +moment.utc(),
@@ -223,6 +223,7 @@ function checkNewEpisode () {
 
 function notifySubscribers () {
 	return through2.obj(function (show, enc, next) {
+		var stream = this;
 		if (show.hasNewEpisode) {
 			db.getSubscribers(show.imdb_id, function (err, subscribers) {
 				if (err || !Array.isArray(subscribers)) return;
