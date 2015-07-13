@@ -71,6 +71,7 @@ function server (config) {
 			.pipe(loadDetails(eztv))
 			.pipe(postProcess())
 			.pipe(checkNewEpisode())
+			.pipe(notifySubscribers())
 			.pipe(save())
 			.pipe(s)
 			.pipe(log())
@@ -228,8 +229,9 @@ function notifySubscribers () {
 			db.getSubscribers(show.imdb_id, function (err, subscribers) {
 				if (err || !Array.isArray(subscribers)) return;
 				subscribers.forEach(function (subscriber) {
+					debug('new episode for: ' + subscriber);
 					yo.yoLink(subscriber, 'http://app.yomypopcorn.com/feed', function (err) {
-						debug('new episode for: ' + subscriber);
+						debug('sent yo to: ' + subscriber);
 					});
 				})
 				debug('new episode ' + show.title);
