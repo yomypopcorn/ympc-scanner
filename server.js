@@ -228,11 +228,11 @@ function notifySubscribers () {
     if (show.hasNewEpisode) {
       var episode = show.episodes[0] || {}
       var feedEntry = {
-        "imdb_id":   	show.imdb_id,
-        "title":    	episode.title,
-        "season":   	episode.season,
-        "episode":  	episode.episode,
-        "poster":   	show.images.fanart,
+        "imdb_id":      show.imdb_id,
+        "title":        episode.title,
+        "season":       episode.season,
+        "episode":      episode.episode,
+        "poster":       show.images.fanart,
         "first_aired":  episode.first_aired
       };
 
