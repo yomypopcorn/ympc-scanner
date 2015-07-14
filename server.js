@@ -226,21 +226,31 @@ function notifySubscribers () {
   return through2.obj(function (show, enc, next) {
     var stream = this;
     if (show.hasNewEpisode) {
+      var episode = show.episodes[0] || {}
+      var feedEntry = {
+        "imdb_id":   	show.imdb_id,
+        "title":    	episode.title,
+        "season":   	episode.season,
+        "episode":  	episode.episode,
+        "poster":   	show.images.fanart,
+        "first_aired":  episode.first_aired
+      };
+
       db.getSubscribers(show.imdb_id, function (err, subscribers) {
         if (err || !Array.isArray(subscribers)) return;
         subscribers.forEach(function (subscriber) {
           debug('new episode for: ' + subscriber);
           yo.yoLink(subscriber, 'http://app.yomypopcorn.com/feed', function (err) {
-            debug('sent yo to: ' + subscriber);
-          });
-        })
-        debug('new episode ' + show.title);
+          debug('sent yo to: ' + subscriber);
+        });
+
+        db.addToFeed(subscriber, feedEntry);
       });
-    }
-    stream.push(show);
-    next()
-  });
-}
+    });
+  }
+  stream.push(show);
+  next()
+});
 
 function save () {
   return through2.obj(function (show, enc, next) {
