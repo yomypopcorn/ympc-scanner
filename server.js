@@ -271,13 +271,13 @@ function notifySubscribers () {
 
             return debug(subscriber, 'notified');
           });
-        })
+        });
       });
-    }
-    stream.push(show);
-    next()
-  });
-}
+    });
+  }
+  stream.push(show);
+  next()
+});
 
 function saveShow () {
   return through2.obj(function (show, enc, next) {
