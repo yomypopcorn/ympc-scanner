@@ -6,9 +6,8 @@ var moment = require('moment');
 var CronJob = require('cron').CronJob;
 var utils = require('yomypopcorn-utils');
 var Yo = require('./yo');
+var usertoken = require('./usertoken');
 
-
-var yo;
 
 var cb = utils.cb;
 var sien = utils.sien;
@@ -16,7 +15,7 @@ var sien = utils.sien;
 exports = module.exports = server;
 
 function server (config) {
-  yo = new Yo(config.yoApiKey);
+  var yo = new Yo(config.yoApiKey);
 
   debug('running as ' + process.env.USER);
 
@@ -264,7 +263,7 @@ function notifySubscribers () {
             return debug(subscriber, 'added episode to feed');
           });
 
-          yo.yoLink(subscriber, 'http://app.yomypopcorn.com/feed?username=' + subscriber, function (err) {
+          yo.yoLink(subscriber, 'http://app.yomypopcorn.com/feed?username=' + subscriber + '&token=' + usertoken.generate(subscriber, config.yoApiKey), function (err) {
             if (err) {
               return debug(subscriber, 'failed to notify');
             }
