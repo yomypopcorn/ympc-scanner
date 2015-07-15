@@ -8,14 +8,14 @@ var utils = require('yomypopcorn-utils');
 var Yo = require('./yo');
 var usertoken = require('./usertoken');
 
-
+var yo;
 var cb = utils.cb;
 var sien = utils.sien;
 
 exports = module.exports = server;
 
 function server (config) {
-  var yo = new Yo(config.yoApiKey);
+  yo = new Yo(config.yoApiKey);
 
   debug('running as ' + process.env.USER);
 
