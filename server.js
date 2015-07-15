@@ -9,6 +9,7 @@ var Yo = require('./yo');
 var usertoken = require('./usertoken');
 
 var yo;
+var createToken;
 var cb = utils.cb;
 var sien = utils.sien;
 
@@ -16,6 +17,10 @@ exports = module.exports = server;
 
 function server (config) {
   yo = new Yo(config.yoApiKey);
+
+  createToken = function (username) {
+    return usertoken.generate(username, config.yoApiKey);
+  };
 
   debug('running as ' + process.env.USER);
 
@@ -263,7 +268,7 @@ function notifySubscribers () {
             return debug(subscriber, 'added episode to feed');
           });
 
-          yo.yoLink(subscriber, 'http://app.yomypopcorn.com/feed?username=' + subscriber + '&token=' + usertoken.generate(subscriber, config.yoApiKey), function (err) {
+          yo.yoLink(subscriber, 'http://app.yomypopcorn.com/feed?username=' + subscriber + '&token=' + createToken(subscriber), function (err) {
             if (err) {
               return debug(subscriber, 'failed to notify');
             }
