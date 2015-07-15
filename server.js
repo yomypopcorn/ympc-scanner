@@ -47,8 +47,9 @@ function server (config) {
       .pipe(loadDetails(eztv))
       .pipe(postProcess())
       .pipe(checkNewEpisode())
+      .pipe(saveEpisodeIfHasSubscribers())
       .pipe(notifySubscribers())
-      .pipe(save())
+      .pipe(saveShow())
       .pipe(s)
       .pipe(log())
       .pipe(sink())
@@ -71,8 +72,9 @@ function server (config) {
       .pipe(loadDetails(eztv))
       .pipe(postProcess())
       .pipe(checkNewEpisode())
+      .pipe(saveEpisodeIfHasSubscribers())
       .pipe(notifySubscribers())
-      .pipe(save())
+      .pipe(saveShow())
       .pipe(s)
       .pipe(log())
       .pipe(sink())
@@ -222,19 +224,54 @@ function checkNewEpisode () {
   });
 }
 
+function saveEpisodeIfHasSubscribers () {
+  return through2.obj(function (show, enc, next) {
+    var stream = this;
+
+    db.getSubscribers(show.imdb_id, function (err, subscribers) {
+      if (err || !subscribers.length) {
+        stream.push(show);
+        return next();
+      }
+
+      db.saveLatestEpisode(show, function (err) {
+        if (err) {
+          console.log(show.imdb_id, err);
+        }
+
+        stream.push(show);
+        next();
+      });
+    });
+  });
+}
+
 function notifySubscribers () {
   return through2.obj(function (show, enc, next) {
     var stream = this;
+
     if (show.hasNewEpisode) {
       db.getSubscribers(show.imdb_id, function (err, subscribers) {
         if (err || !Array.isArray(subscribers)) return;
+
         subscribers.forEach(function (subscriber) {
-          debug('new episode for: ' + subscriber);
+
+          db.addLatestEpisodeToFeed(subscriber, show, function (err) {
+            if (err) {
+              return debug(subscriber, 'failed to add episode to feed');
+            }
+
+            return debug(subscriber, 'added episode to feed');
+          });
+
           yo.yoLink(subscriber, 'http://app.yomypopcorn.com/feed', function (err) {
-            debug('sent yo to: ' + subscriber);
+            if (err) {
+              return debug(subscriber, 'failed to notify');
+            }
+
+            return debug(subscriber, 'notified');
           });
         })
-        debug('new episode ' + show.title);
       });
     }
     stream.push(show);
@@ -242,7 +279,7 @@ function notifySubscribers () {
   });
 }
 
-function save () {
+function saveShow () {
   return through2.obj(function (show, enc, next) {
     var stream = this;
 
