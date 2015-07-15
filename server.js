@@ -264,7 +264,7 @@ function notifySubscribers () {
             return debug(subscriber, 'added episode to feed');
           });
 
-          yo.yoLink(subscriber, 'http://app.yomypopcorn.com/feed', function (err) {
+          yo.yoLink(subscriber, 'http://app.yomypopcorn.com/feed?username=' + subscriber, function (err) {
             if (err) {
               return debug(subscriber, 'failed to notify');
             }
