@@ -182,6 +182,7 @@ function postProcess () {
     show.latestEpisode = episodes[0];
 
     if (show.latestEpisode) {
+      show.latestEpisode.first_aired = +show.latestEpisode.first_aired * 1000;
       show.latestEpisode.sien = sien(show.latestEpisode.season, show.latestEpisode.episode);
     }
 
