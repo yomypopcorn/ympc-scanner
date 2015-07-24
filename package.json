@@ -18,6 +18,8 @@
   ],
   "license": "MIT",
   "dependencies": {
+    "async": "^1.4.0",
+    "bole": "^2.0.0",
     "cron": "^1.0.6",
     "debug": "^2.1.1",
     "eztvapi": "0.1.3",

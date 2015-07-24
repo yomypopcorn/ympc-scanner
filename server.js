@@ -1,8 +1,10 @@
 var debug = require('debug')('yomypopcorn:scanner');
+var log = require('bole')('scanner');
 var db = require('./dbclient');
 var eztvapi = require('eztvapi');
 var through2 = require('through2');
 var moment = require('moment');
+var async = require('async');
 var CronJob = require('cron').CronJob;
 var utils = require('yomypopcorn-utils');
 var Yo = require('./yo');
@@ -13,6 +15,9 @@ var createToken;
 var cb = utils.cb;
 var sien = utils.sien;
 
+var activeShowStatuses = [ 'returning series', 'continuing', 'in production', 'planned' ];
+var inactiveShowStatuses = [ 'ended', 'canceled' ];
+
 exports = module.exports = server;
 
 function server (config) {
@@ -22,7 +27,7 @@ function server (config) {
     return usertoken.generate(username, config.yoApiKey);
   };
 
-  debug('running as ' + process.env.USER);
+  log.debug('running as ' + process.env.USER);
 
   var rateLimit = config['eztv-rate-limit'].split('/');
   var rateLimitRequests = parseInt(rateLimit[0], 10);
@@ -34,59 +39,63 @@ function server (config) {
   });
 
   function start () {
-    debug('server started');
-    debug('full scan pattern', config['full-scan-cron-pattern']);
-    debug('active scan pattern', config['active-scan-cron-pattern']);
+    log.debug('server started in daemon mode');
+    log.debug('full scan pattern', config['full-scan-cron-pattern']);
+    log.debug('active scan pattern', config['active-scan-cron-pattern']);
 
     var fullScanCron = new CronJob(config['full-scan-cron-pattern'], fullScan, null, true);
     var activeScanCron = new CronJob(config['active-scan-cron-pattern'], activeScan, null, true);
   }
 
   function fullScan (done) {
-    debug('full scan start');
+    log.info('full scan start');
 
     var s = stats();
 
-    eztv.createShowsStream()
+    return eztv.createShowsStream()
       .pipe(loadDetails(eztv))
       .pipe(postProcess())
-      .pipe(checkNewEpisode())
-      .pipe(saveEpisodeIfHasSubscribers())
-      .pipe(notifySubscribers())
       .pipe(saveShow())
+      .pipe(saveEpisodesIfActive())
+      .pipe(checkNewEpisode())
+      .pipe(saveLatestEpisodeIfNew())
+      .pipe(addEpisodesToSubscriberFeeds())
+      .pipe(notifySubscribers())
+      .pipe(dbg())
       .pipe(s)
-      .pipe(log())
       .pipe(sink())
       .on('error', function (err) {
-        debug('full scan error', err);
+        log.error('full scan error', err);
       })
       .on('finish', function () {
-        debug('full scan complete', s.stats);
+        log.info('full scan complete', s.stats);
         db.log('fullscan', s.stats);
         cb(done);
       });
   }
 
   function activeScan (done) {
-    debug('active scan start');
+    log.info('active scan start');
 
     var s = stats();
 
     db.createActiveShowsStream()
       .pipe(loadDetails(eztv))
       .pipe(postProcess())
-      .pipe(checkNewEpisode())
-      .pipe(saveEpisodeIfHasSubscribers())
-      .pipe(notifySubscribers())
       .pipe(saveShow())
+      .pipe(saveEpisodesIfActive())
+      .pipe(checkNewEpisode())
+      .pipe(saveLatestEpisodeIfNew())
+      .pipe(addEpisodesToSubscriberFeeds())
+      .pipe(notifySubscribers())
+      .pipe(dbg())
       .pipe(s)
-      .pipe(log())
       .pipe(sink())
       .on('error', function (err) {
-        debug('active scan error', err);
+        log.error('active scan error', err);
       })
       .on('finish', function () {
-        debug('active scan complete', s.stats);
+        log.info('active scan complete', s.stats);
         db.log('activescan', s.stats);
         cb(done);
       });
@@ -97,16 +106,6 @@ function server (config) {
     fullScan: fullScan,
     start: start
   };
-}
-
-function log () {
-  var c = 0;
-  return through2.obj(function (chunk, enc, next) {
-    c += 1;
-    //console.log(c, chunk.title, chunk.active);
-    this.push(chunk);
-    next();
-  });
 }
 
 function sink () {
@@ -164,123 +163,81 @@ function loadDetails (eztv) {
   });
 }
 
-function postProcess () {
+function dbg () {
   return through2.obj(function (show, enc, next) {
-    show.active = false;
-    show.active = ([ 'ended', 'canceled' ].indexOf(show.status) === -1);
-    show.active = ([ 'returning series', 'continuing', 'in production' ].indexOf(show.status) !== -1);
-
-    var episodes = show.episodes.sort(function (a, b) {
-      var x = b.season - a.season;
-      return x === 0 ? b.episode - a.episode : x;
-    });
-
-    episodes = episodes.filter(function (episode) {
-      return (episode.torrents && (Object.keys(episode.torrents).length) > 0);
-    });
-
-    show.latestEpisode = episodes[0];
-
-    if (show.latestEpisode) {
-      show.latestEpisode.first_aired = +show.latestEpisode.first_aired * 1000;
-      show.latestEpisode.sien = sien(show.latestEpisode.season, show.latestEpisode.episode);
-    }
-
-    show.rating = show.rating.percentage;
-    show.poster = show.images.poster;
-    show.fanart = show.images.fanart;
-
+    log.debug(show.id);
     this.push(show);
     next();
   });
 }
 
-function checkNewEpisode () {
+function postProcess () {
   return through2.obj(function (show, enc, next) {
-    var stream = this;
+    var isActive = false;
+    isActive = inactiveShowStatuses.indexOf(show.status) === -1;
+    isActive = activeShowStatuses.indexOf(show.status) !== -1;
 
-    db.getLatestEpisode(show.imdb_id, function (err, currentEpisode) {
-      var latestEpisode = show.latestEpisode;
-
-      if (!latestEpisode) {
-        debug('show has no episodes', show.imdb_id);
-        stream.push(show);
-        return next();
-      }
-
-      if (!currentEpisode || latestEpisode.sien > currentEpisode.sien) {
-
-        db.log('episodeupdate', {
-          imdb_id: show.imdb_id,
-          prev_season: currentEpisode ? currentEpisode.season : null,
-          prev_episode: currentEpisode ? currentEpisode.episode : null,
-          new_season: latestEpisode ? latestEpisode.season : null,
-          new_episode: latestEpisode ? latestEpisode.episode : null
-        });
-
-        show.hasNewEpisode = true;
-
-        debug('new episode', show.title, 'S' + latestEpisode.season + 'E' + latestEpisode.episode, latestEpisode.sien);
-      }
-
-      stream.push(show);
-      next();
-    });
-  });
-}
-
-function saveEpisodeIfHasSubscribers () {
-  return through2.obj(function (show, enc, next) {
-    var stream = this;
-
-    db.getSubscribers(show.imdb_id, function (err, subscribers) {
-      if (err || !subscribers.length) {
-        stream.push(show);
-        return next();
-      }
-
-      db.saveLatestEpisode(show, function (err) {
-        if (err) {
-          console.log(show.imdb_id, err);
-        }
-
-        stream.push(show);
-        next();
-      });
-    });
-  });
-}
-
-function notifySubscribers () {
-  return through2.obj(function (show, enc, next) {
-    var stream = this;
-
-    if (show.hasNewEpisode) {
-      db.getSubscribers(show.imdb_id, function (err, subscribers) {
-        if (err || !Array.isArray(subscribers)) return;
-
-        subscribers.forEach(function (subscriber) {
-
-          db.addLatestEpisodeToFeed(subscriber, show, function (err) {
-            if (err) {
-              return debug(subscriber, 'failed to add episode to feed');
-            }
-
-            return debug(subscriber, 'added episode to feed');
-          });
-
-          yo.yoLink(subscriber, 'http://app.yomypopcorn.com/feed?username=' + subscriber + '&token=' + createToken(subscriber), function (err) {
-            if (err) {
-              return debug(subscriber, 'failed to notify');
-            }
-
-            return debug(subscriber, 'notified');
-          });
-        });
-      });
+    if (activeShowStatuses.concat(inactiveShowStatuses).indexOf(show.status) === -1) {
+      log.warn('show', show._id, 'has unidentified status:', show.status);
     }
-    stream.push(show);
-    next()
+
+    var newShow = {
+      id: show._id,
+      imdb_id: show.imdb_id,
+      tvdb_id: show.tvdb_id,
+      active: isActive,
+      title: show.title,
+      slug: show.slug,
+      synopsis: show.synopsis,
+      year: show.year,
+      network: show.network,
+      air_day: show.air_day,
+      air_time: show.air_time,
+      country: show.country
+    };
+
+    if (show.rating && show.rating.hated) { newShow.rating_hated = +show.rating.hated; }
+    if (show.rating && show.rating.loved) { newShow.rating_loved = +show.rating.loved; }
+    if (show.rating && show.rating.percentage) { newShow.rating = +show.rating.percentage; }
+
+    if (show.images && show.images.poster) { newShow.poster = show.images.poster; }
+    if (show.images && show.images.fanart) { newShow.fanart = show.images.fanart; }
+    if (show.images && show.images.banner) { newShow.banner = show.images.banner; }
+
+    var episodes = show.episodes
+      .map(function (episode) {
+        var hasTorrents = episode.torrents && (Object.keys(episode.torrents).length) > 0;
+
+        return {
+          title: episode.title,
+          sien: sien(episode.season, episode.episode),
+          season: episode.season,
+          episode: episode.episode,
+          overview: episode.overview,
+          first_aired: episode.first_aired * 1000,
+          tvdb_id: episode.tvdb_id,
+          active: hasTorrents
+        };
+      })
+      .reduce(function (episodes, episode) {
+        episodes[episode.sien] = episode;
+        return episodes;
+      }, {});
+
+    var latestEpisode = episodes[Object.keys(episodes).reduce(function (latestKey, currentKey) {
+      var latest = episodes[latestKey];
+      var current = episodes[currentKey];
+
+      if (!current.active) { return latestKey; }
+      if (!latest || current.sien >= latest.sien) { return currentKey; }
+      return latestKey;
+    }, null)] || null;;
+
+    newShow.latestEpisode = latestEpisode;
+    newShow.episodes = episodes;
+
+    this.push(newShow);
+    next();
   });
 }
 
@@ -292,5 +249,138 @@ function saveShow () {
       stream.push(show);
       next();
     });
+  });
+}
+
+function saveEpisodesIfActive () {
+  return through2.obj(function (show, enc, next) {
+    var stream = this;
+
+    var hasEpisodes = !!Object.keys(show.episodes).length;
+
+    if (!show.active || !hasEpisodes) {
+      stream.push(show);
+      return next();
+    }
+
+    var episodes = Object.keys(show.episodes).map(function (key) {
+      return show.episodes[key];
+    });
+
+    async.each(
+      episodes,
+      function (episode, callback) {
+        db.saveEpisode(show.id, episode, function (err) {
+          callback(err);
+        });
+      },
+      function (err) {
+        stream.push(show);
+        next();
+      }
+    );
+
+  });
+}
+
+function checkNewEpisode () {
+  return through2.obj(function (show, enc, next) {
+    var stream = this;
+
+    var hasEpisodes = !!Object.keys(show.episodes).length;
+
+    if (!hasEpisodes) {
+      log.info('show has no episodes:', show.id);
+    }
+
+    if (!show.active || !show.latestEpisode || !hasEpisodes) {
+        show.hasNewEpisode = false;
+        stream.push(show);
+        return next();
+    }
+
+    db.getLatestEpisode(show.id, function (err, episode) {
+      show.hasNewEpisode = !episode || show.latestEpisode.sien > episode.sien;
+
+      if (show.hasNewEpisode) {
+        log.info('new episode for ' + show.id + ':', 'S' + show.latestEpisode.season + 'E' + show.latestEpisode.episode);
+      }
+
+      stream.push(show);
+      next();
+    });
+  });
+}
+
+function saveLatestEpisodeIfNew () {
+  return through2.obj(function (show, enc, next) {
+    var stream = this;
+
+    if (!show.hasNewEpisode) {
+      stream.push(show);
+      return next();
+    }
+
+    db.saveLatestEpisode(show.id, show.latestEpisode, function () {
+      stream.push(show);
+      next();
+    });
+  });
+}
+
+function addEpisodesToSubscriberFeeds () {
+  return through2.obj(function (show, enc, next) {
+    var stream = this;
+
+    if (!show.hasNewEpisode) {
+      stream.push(show);
+      return next();
+    }
+
+    db.getSubscribers(show.id, function (err, subscribers) {
+      if (err || !Array.isArray(subscribers)) {
+        stream.push(show);
+        return next();
+      }
+
+      async.each(
+        subscribers,
+        function (userId, callback) {
+          db.addLatestEpisodeToFeed(userId, show.id, function (err) {
+            callback(err);
+          });
+        },
+        function (err) {
+          stream.push(show);
+          next();
+        }
+      );
+
+    });
+  });
+}
+
+function notifySubscribers () {
+  return through2.obj(function (show, enc, next) {
+    var stream = this;
+
+    if (show.hasNewEpisode) {
+      db.getSubscribers(show.id, function (err, subscribers) {
+        if (err || !Array.isArray(subscribers)) { return; }
+
+        subscribers.forEach(function (userId) {
+          yo.yoLink(userId, 'http://app.yomypopcorn.com/feed?username=' + userId + '&token=' + createToken(userId), function (err) {
+            if (err) {
+              return log.error('failed to notify user', userId, 'about', show.id);
+            }
+
+            log.info('notified user', userId, 'about', show.id);
+          });
+        });
+      });
+    }
+
+    stream.push(show);
+    next();
   });
 }
