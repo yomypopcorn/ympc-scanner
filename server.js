@@ -17,6 +17,12 @@ var generateUserToken = utils.generateUserToken;
 var activeShowStatuses = [ 'returning series', 'continuing', 'in production', 'planned' ];
 var inactiveShowStatuses = [ 'ended', 'canceled' ];
 
+function isErrorCode (code) {
+  return function (err) {
+    return err.statusCode === code;
+  }
+}
+
 exports = module.exports = server;
 
 function server (config) {
@@ -356,6 +362,12 @@ function notifySubscribers () {
         return yo.yoLink(userId, 'http://app.yomypopcorn.com/feed?username=' + userId + '&token=' + createToken(userId))
           .then(function () {
             log.info('notified user', userId, 'about', show.id);
+            db.resetYoFailCount(userId);
+          })
+          .catch(isErrorCode(404), function (err) {
+            db.incrementYoFailCount(userId);
+            log.error(err.error);
+            log.error('failed to notify user', userId, 'about', show.id + ': the user does not exist of has unsubscribed/blocked');
           })
           .catch(function (err) {
             log.error(err.error);
