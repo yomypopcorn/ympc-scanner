@@ -18,16 +18,15 @@
   ],
   "license": "MIT",
   "dependencies": {
-    "async": "^1.4.0",
+    "bluebird": "^2.9.34",
     "bole": "^2.0.0",
     "cron": "^1.0.6",
-    "debug": "^2.1.1",
     "eztvapi": "0.1.3",
     "moment": "^2.9.0",
     "rc": "^0.5.5",
-    "request": "^2.58.0",
     "through2": "^0.6.3",
+    "ympc-yo": "git+https://github.com/yomypopcorn/ympc-yo.git#master",
     "yomypopcorn-dbclient": "git+https://github.com/yomypopcorn/yomypopcorn-dbclient.git#master",
-    "yomypopcorn-utils": "0.0.1"
+    "ympc-utils": "git+https://github.com/yomypopcorn/yomypopcorn-utils.git#master"
   }
 }

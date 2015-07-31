@@ -1,19 +1,18 @@
-var debug = require('debug')('yomypopcorn:scanner');
 var log = require('bole')('scanner');
+var Promise = require('bluebird');
 var db = require('./dbclient');
 var eztvapi = require('eztvapi');
 var through2 = require('through2');
 var moment = require('moment');
-var async = require('async');
 var CronJob = require('cron').CronJob;
-var utils = require('yomypopcorn-utils');
-var Yo = require('./yo');
-var usertoken = require('./usertoken');
+var utils = require('ympc-utils');
+var Yo = require('ympc-yo');
 
 var yo;
 var createToken;
 var cb = utils.cb;
 var sien = utils.sien;
+var generateUserToken = utils.generateUserToken;
 
 var activeShowStatuses = [ 'returning series', 'continuing', 'in production', 'planned' ];
 var inactiveShowStatuses = [ 'ended', 'canceled' ];
@@ -24,7 +23,7 @@ function server (config) {
   yo = new Yo(config.yoApiKey);
 
   createToken = function (username) {
-    return usertoken.generate(username, config.yoApiKey);
+    return generateUserToken(config.yoApiKey, username);
   };
 
   log.debug('running as ' + process.env.USER);
@@ -245,10 +244,11 @@ function saveShow () {
   return through2.obj(function (show, enc, next) {
     var stream = this;
 
-    db.saveShow(show, function () {
-      stream.push(show);
-      next();
-    });
+    db.saveShow(show)
+      .finally(function () {
+        stream.push(show);
+        next();
+      })
   });
 }
 
@@ -263,22 +263,15 @@ function saveEpisodesIfActive () {
       return next();
     }
 
-    var episodes = Object.keys(show.episodes).map(function (key) {
-      return show.episodes[key];
+    var saves = Promise.map(Object.keys(show.episodes), function (key) {
+      return db.saveEpisode(show.id, show.episodes[key]);
     });
 
-    async.each(
-      episodes,
-      function (episode, callback) {
-        db.saveEpisode(show.id, episode, function (err) {
-          callback(err);
-        });
-      },
-      function (err) {
+    Promise.settle(saves)
+      .then(function () {
         stream.push(show);
         next();
-      }
-    );
+      });
 
   });
 }
@@ -299,16 +292,17 @@ function checkNewEpisode () {
         return next();
     }
 
-    db.getLatestEpisode(show.id, function (err, episode) {
-      show.hasNewEpisode = !episode || show.latestEpisode.sien > episode.sien;
+    db.getLatestEpisode(show.id)
+      .then(function (episode) {
+        show.hasNewEpisode = !episode || show.latestEpisode.sien > episode.sien;
 
-      if (show.hasNewEpisode) {
-        log.info('new episode for ' + show.id + ':', 'S' + show.latestEpisode.season + 'E' + show.latestEpisode.episode);
-      }
+        if (show.hasNewEpisode) {
+          log.info('new episode for ' + show.id + ':', 'S' + show.latestEpisode.season + 'E' + show.latestEpisode.episode);
+        }
 
-      stream.push(show);
-      next();
-    });
+        stream.push(show);
+        next();
+      });
   });
 }
 
@@ -321,10 +315,11 @@ function saveLatestEpisodeIfNew () {
       return next();
     }
 
-    db.saveLatestEpisode(show.id, show.latestEpisode, function () {
-      stream.push(show);
-      next();
-    });
+    db.saveLatestEpisode(show.id, show.latestEpisode)
+      .then(function () {
+        stream.push(show);
+        next();
+      });
   });
 }
 
@@ -337,26 +332,18 @@ function addEpisodesToSubscriberFeeds () {
       return next();
     }
 
-    db.getSubscribers(show.id, function (err, subscribers) {
-      if (err || !Array.isArray(subscribers)) {
+    var addToUserFeed = function (showId) {
+      return function (userId) {
+        return db.addLatestEpisodeToFeed(userId, showId);
+      };
+    };
+
+    db.getSubscribers(show.id)
+      .map(addToUserFeed(show.id))
+      .then(function () {
         stream.push(show);
-        return next();
-      }
-
-      async.each(
-        subscribers,
-        function (userId, callback) {
-          db.addLatestEpisodeToFeed(userId, show.id, function (err) {
-            callback(err);
-          });
-        },
-        function (err) {
-          stream.push(show);
-          next();
-        }
-      );
-
-    });
+        next();
+      });
   });
 }
 
@@ -365,19 +352,21 @@ function notifySubscribers () {
     var stream = this;
 
     if (show.hasNewEpisode) {
-      db.getSubscribers(show.id, function (err, subscribers) {
-        if (err || !Array.isArray(subscribers)) { return; }
-
-        subscribers.forEach(function (userId) {
-          yo.yoLink(userId, 'http://app.yomypopcorn.com/feed?username=' + userId + '&token=' + createToken(userId), function (err) {
-            if (err) {
-              return log.error('failed to notify user', userId, 'about', show.id);
-            }
-
+      var sendYoLink = function (userId) {
+        return yo.yoLink(userId, 'http://app.yomypopcorn.com/feed?username=' + userId + '&token=' + createToken(userId))
+          .then(function () {
             log.info('notified user', userId, 'about', show.id);
+          })
+          .catch(function (err) {
+            log.error(err.error);
+            log.error('failed to notify user', userId, 'about', show.id, err.statusCode, err.message);
           });
-        });
-      });
+      };
+
+      var yos = db.getSubscribers(show.id)
+        .map(sendYoLink);
+
+      Promise.settle(yos);
     }
 
     stream.push(show);
