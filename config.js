@@ -11,4 +11,4 @@ var defaults = {
   'active-scan-cron-pattern': '0 0 1-23 * * *'
 };
 
-module.exports = require('rc')('yomypopcorn-scanner', defaults);
+module.exports = require('rc')('ympc-scanner', defaults);

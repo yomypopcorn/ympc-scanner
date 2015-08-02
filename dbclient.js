@@ -1,4 +1,4 @@
-var db = require('yomypopcorn-dbclient');
+var db = require('ympc-dbclient');
 var config = require('./config');
 
 exports = module.exports = db({

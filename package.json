@@ -1,5 +1,5 @@
 {
-  "name": "yomypopcorn-scanner",
+  "name": "ympc-scanner",
   "version": "0.0.3",
   "description": "",
   "bin": {
@@ -26,7 +26,7 @@
     "rc": "^0.5.5",
     "through2": "^0.6.3",
     "ympc-yo": "git+https://github.com/yomypopcorn/ympc-yo.git#master",
-    "yomypopcorn-dbclient": "git+https://github.com/yomypopcorn/yomypopcorn-dbclient.git#master",
-    "ympc-utils": "git+https://github.com/yomypopcorn/yomypopcorn-utils.git#master"
+    "ympc-dbclient": "git+https://github.com/yomypopcorn/ympc-dbclient.git#master",
+    "ympc-utils": "git+https://github.com/yomypopcorn/ympc-utils.git#master"
   }
 }
