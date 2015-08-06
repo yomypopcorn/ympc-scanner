@@ -1,14 +1,32 @@
 var defaults = {
-  'redis-socket': null,
-  'redis-host': '127.0.0.1',
-  'redis-port': 6379,
-  'redis-password': null,
+  redis: {
+    socket: null,
+    host: '127.0.0.1',
+    port: 6379,
+    password: null
+  },
 
-  yoApiKey: 'yo-api-key',
-  'eztv-rate-limit': '1/1000',
+  app: {
+    url: 'http://app.yomypopcorn.com'
+  },
 
-  'full-scan-cron-pattern': '0 0 0 * * *',
-  'active-scan-cron-pattern': '0 0 1-23 * * *'
+  yo: {
+    apikey: 'yo-api-key'
+  },
+
+  eztv: {
+    ratelimit: '1/1000'
+  },
+
+  scan: {
+    full: { cronpattern: '0 0 0 * * *' },
+    active: { cronpattern: '0 0 1-23 * * *' }
+  }
 };
 
-module.exports = require('rc')('ympc-scanner', defaults);
+var aliases = {
+  d: 'debug',
+  v: 'version'
+};
+
+module.exports = require('rucola')('ympc-scanner', defaults, aliases);
