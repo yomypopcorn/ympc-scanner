@@ -30,7 +30,7 @@ function server (config) {
   var appUrl = config.get('app.url');
 
   var createToken = function (username) {
-    return generateUserToken(config.yoApiKey, username);
+    return generateUserToken(config.get('yo.apikey'), username);
   };
 
   log.debug('running as ' + process.env.USER);
