@@ -398,7 +398,10 @@ function server (config) {
               .attempts(5)
               .backoff({ delay: 20 * 60 * 1000, type: 'exponential' })
               .save(function (err) {
-                if (err) { return reject(err); }
+                if (err) {
+                  log.error('failed to save job:', job.id);
+                  return reject(err);
+                }
 
                 log.info('created sendyo job:', job.id, {
                   userId: payload.userId,
