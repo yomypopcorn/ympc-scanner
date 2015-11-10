@@ -41,7 +41,8 @@ function server (config) {
 
   var eztv = eztvapi({
     apiLimitRequests: rateLimitRequests,
-    apiLimitInterval: rateLimitInterval
+    apiLimitInterval: rateLimitInterval,
+    apiUrl: config.get('eztv.apiurl')
   });
 
   var q = config.get('redis.socket')
