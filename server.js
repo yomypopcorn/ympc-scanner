@@ -3,6 +3,7 @@ var log = require('bole')('scanner');
 var Promise = require('bluebird');
 var db = require('./dbclient');
 var eztvapi = require('eztvapi');
+var FanarttvAPI = require('fanarttv');
 var through2 = require('through2');
 var moment = require('moment');
 var CronJob = require('cron').CronJob;
@@ -45,6 +46,8 @@ function server (config) {
     apiUrl: config.get('eztv.apiurl')
   });
 
+  var fanarttv = new FanarttvAPI(config.get('fanarttv.apikey'));
+
   var q = config.get('redis.socket')
     ? kue.createQueue({
         prefix: 'queue',
@@ -79,6 +82,7 @@ function server (config) {
 
     return eztv.createShowsStream()
       .pipe(loadDetails(eztv))
+      .pipe(loadFanart(fanarttv))
       .pipe(postProcess())
       .pipe(saveShow())
       .pipe(saveEpisodesIfActive())
@@ -106,6 +110,7 @@ function server (config) {
 
     db.createActiveShowsStream()
       .pipe(loadDetails(eztv))
+      .pipe(loadFanart(fanarttv))
       .pipe(postProcess())
       .pipe(saveShow())
       .pipe(saveEpisodesIfActive())
@@ -181,6 +186,47 @@ function server (config) {
     });
   }
 
+  function loadFanart(fanarttv) {
+    return through2.obj(function (show, enc, next) {
+      var stream = this;
+
+      if (!show.tvdb_id) {
+        log.warn('no tvdb_id for', show.imdb_id);
+        stream.push(show);
+        return next();
+      }
+
+      fanarttv.getImagesForTVShow(show.tvdb_id, function (err, res) {
+        if (err) {
+          log.error('failed to fetch fanart for', show.imdb_id, res);
+          stream.push(show);
+          return next();
+        }
+
+        function bestImageReducer (best, current) {
+          if (!best || +current.likes > +best.likes) {
+            return current;
+          }
+
+          return best;
+        }
+
+        var posters = res.tvposter || [];
+        var banners = res.tvbanner || [];
+        var poster = posters.reduce(bestImageReducer, null);
+        var banner = banners.reduce(bestImageReducer, null);
+
+        show.fanart = {
+          poster: poster ? poster.url.replace(/^https?:(.+)$/, 'https:$1') : null,
+          banner: banner ? banner.url.replace(/^https?:(.+)$/, 'https:$1') : null
+        };
+
+        stream.push(show);
+        return next();
+      });
+    });
+  }
+
   function dbg () {
     return through2.obj(function (show, enc, next) {
       log.debug(show.id);
@@ -218,9 +264,14 @@ function server (config) {
       if (show.rating && show.rating.loved) { newShow.rating_loved = +show.rating.loved; }
       if (show.rating && show.rating.percentage) { newShow.rating = +show.rating.percentage; }
 
-      if (show.images && show.images.poster) { newShow.poster = show.images.poster; }
-      if (show.images && show.images.fanart) { newShow.fanart = show.images.fanart; }
-      if (show.images && show.images.banner) { newShow.banner = show.images.banner; }
+      if (show.fanart && show.fanart.poster) {
+        newShow.poster = show.fanart.poster;
+        newShow.fanart = show.fanart.poster;
+      }
+
+      if (show.fanart && show.fanart.banner) {
+        newShow.banner = show.fanart.banner;
+      }
 
       var episodes = show.episodes
         .map(function (episode) {
