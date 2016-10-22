@@ -29,13 +29,13 @@ yomypopcorn-scanner
 Scan the Popcorn API for new shows.
 
 ```sh
-yomypopcorn-scanner --full-scan
+yomypopcorn-scanner full-scan
 ```
 
 Check *active* shows for new episodes.
 
 ```sh
-yomypopcorn-scanner --active-scan
+yomypopcorn-scanner active-scan
 ```
 
 ### Options
