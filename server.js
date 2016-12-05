@@ -3,7 +3,7 @@ var log = require('bole')('scanner');
 var Promise = require('bluebird');
 var db = require('./dbclient');
 var eztvapi = require('eztvapi');
-var FanarttvAPI = require('fanarttv');
+var request = require('request');
 var through2 = require('through2');
 var moment = require('moment');
 var CronJob = require('cron').CronJob;
@@ -46,8 +46,6 @@ function server (config) {
     apiUrl: config.get('eztv.apiurl')
   });
 
-  var fanarttv = new FanarttvAPI(config.get('fanarttv.apikey'));
-
   var q = config.get('redis.socket')
     ? kue.createQueue({
         prefix: 'queue',
@@ -82,7 +80,7 @@ function server (config) {
 
     return eztv.createShowsStream()
       .pipe(loadDetails(eztv))
-      .pipe(loadFanart(fanarttv))
+      .pipe(loadFanart())
       .pipe(postProcess())
       .pipe(saveShow())
       .pipe(saveEpisodesIfActive())
@@ -110,7 +108,7 @@ function server (config) {
 
     db.createActiveShowsStream()
       .pipe(loadDetails(eztv))
-      .pipe(loadFanart(fanarttv))
+      .pipe(loadFanart())
       .pipe(postProcess())
       .pipe(saveShow())
       .pipe(saveEpisodesIfActive())
@@ -186,7 +184,7 @@ function server (config) {
     });
   }
 
-  function loadFanart(fanarttv) {
+  function loadFanart () {
     return through2.obj(function (show, enc, next) {
       var stream = this;
 
@@ -196,7 +194,23 @@ function server (config) {
         return next();
       }
 
-      fanarttv.getImagesForTVShow(show.tvdb_id, function (err, res) {
+      function getImagesForTvShow(id, callback) {
+        var uri = 'http://webservice.fanart.tv/v3/tv/' + id + '?api_key=' + config.get('fanarttv.apikey');
+        var requestOptions = {
+          url: uri,
+          json: true
+        };
+
+        request.get(requestOptions, function (err, res, body) {
+          if (err || res.statusCode !== 200 || !body) {
+            return callback(err || new Error('Unknown Fanart Error: ' + res.statusCode), body);
+          }
+
+          callback(null, body);
+        });
+      }
+
+      getImagesForTvShow(show.tvdb_id, function (err, res) {
         if (err) {
           log.error('failed to fetch fanart for', show.imdb_id, res);
           stream.push(show);
