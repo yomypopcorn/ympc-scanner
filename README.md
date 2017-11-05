@@ -2,6 +2,7 @@ YOMYPOPCORN Scanner
 ===================
 
 ![stack](./images/yomypopcorn-architecture.png)
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fyomypopcorn%2Fympc-scanner.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Fyomypopcorn%2Fympc-scanner?ref=badge_shield)
 
 This is the **scanner** app of the YOMYPOPCORN stack. It does the following tings:
 
@@ -54,3 +55,6 @@ yomypopcorn-scanner active-scan
 ## License
 
 MIT
+
+
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fyomypopcorn%2Fympc-scanner.svg?type=large)](https://app.fossa.io/projects/git%2Bgithub.com%2Fyomypopcorn%2Fympc-scanner?ref=badge_large)
